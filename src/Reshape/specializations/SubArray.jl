@@ -90,6 +90,13 @@ function _subarray_reshape_codegen(T, N::Int, M::Int, op_types::Core.SimpleVecto
                     prod_parts = [:(size(parent(x), $(expected_pd + j))) for j in 0:(n_in - 2)]
                     prod_expr = length(prod_parts) == 1 ? prod_parts[1] : Expr(:call, :*, prod_parts...)
                     push!(view_inds, :(Base.OneTo(length(inds[$last_pd]) * $prod_expr)))
+                elseif last_idx_type <: UnitRange{<:Integer}
+                    last_pd = expected_pd + last_j
+                    prod_parts = [:(size(parent(x), $(expected_pd + j))) for j in 0:(n_in - 2)]
+                    prod_expr = length(prod_parts) == 1 ? prod_parts[1] : Expr(:call, :*, prod_parts...)
+                    push!(view_inds, :(let r = inds[$last_pd], prod = $prod_expr
+                        ((first(r) - 1) * prod + 1):(last(r) * prod)
+                    end))
                 else
                     return fallback()
                 end
