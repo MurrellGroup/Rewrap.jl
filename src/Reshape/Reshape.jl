@@ -1,27 +1,4 @@
-abstract type LocalAxisOp{N,M} <: AxisOp{N,M} end
-
-# scans like a cursor, consuming N axes, and emitting M axes
-abstract type LocalReshape{N,M} <: LocalAxisOp{N,M} end
-
-struct Keep{N} <: LocalReshape{N,N} end
-Keep(N::IntOrEllipsis = 1) = Keep{N}()
-
-struct Merge{N} <: LocalReshape{N,1} end
-Merge(N::IntOrEllipsis) = Merge{N}()
-
-struct Split{N,M,T<:NTuple{M,IntOrColon}} <: LocalReshape{N,M}
-    sizes::T
-end
-
-Split(N::IntOrEllipsis, sizes::T) where {M,T<:NTuple{M,IntOrColon}} =
-    Split{N,M,T}(sizes)
-
-struct Resqueeze{N,M} <: LocalReshape{N,M} end
-Resqueeze((N,M)::Pair) = Resqueeze{N,M}()
-
-Squeeze(N::IntOrEllipsis = 1) = Resqueeze(N => 0)
-Unsqueeze(M::Int = 1) = Resqueeze(0 => M)
-
+include("LocalReshape.jl")
 include("utils.jl")
 
 struct Reshape{OpsT,N,M} <: GlobalAxisOp{N,M}

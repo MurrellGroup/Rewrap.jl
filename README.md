@@ -1,9 +1,9 @@
-# AxisOperations
+# Rewrap
 
-[![Build Status](https://github.com/MurrellGroup/AxisOperations.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/MurrellGroup/AxisOperations.jl/actions/workflows/CI.yml?query=branch%3Amain)
-[![Coverage](https://codecov.io/gh/MurrellGroup/AxisOperations.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/MurrellGroup/AxisOperations.jl)
+[![Build Status](https://github.com/MurrellGroup/Rewrap.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/MurrellGroup/Rewrap.jl/actions/workflows/CI.yml?query=branch%3Amain)
+[![Coverage](https://codecov.io/gh/MurrellGroup/Rewrap.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/MurrellGroup/Rewrap.jl)
 
-AxisOperations makes lazy wrappers more tractable, and double wrappers less common, by using compile-time type information about the structure of operations to generate custom code at no runtime cost.
+Rewrap makes lazy wrappers more tractable, and double wrappers less common, by using compile-time type information about the structure of operations to generate custom code at no runtime cost.
 
 The primitives in this package support downstream packages such as [Einops.jl](https://github.com/MurrellGroup/Einops.jl), whose declarative syntax leverages these rewrapping optimizations.
 
@@ -25,10 +25,10 @@ true
 
 We use `size(y, 1)` in our reshape, but despite preserving the first dimension (the one dimension only partially sliced) it evaluates to an integer at runtime, and Julia has no way of knowing that it represents preserving the first dimension. The size could in theory be constant-propagated [if the size wasn't dynamic](https://github.com/JuliaArrays/FixedSizeArrays.jl), [or if the size is embedded in the type](https://github.com/JuliaArrays/StaticArrays.jl), but even then, integers alone are not useful once passed through `reshape`.
 
-AxisOperations provides types like `Keep`, `Merge`, and `Split` that encode reshape structure at compile-time, enabling rewrapping optimizations.
+Rewrap provides types like `Keep`, `Merge`, and `Split` that encode reshape structure at compile-time, enabling rewrapping optimizations.
 
 ```julia
-julia> using AxisOperations
+julia> using Rewrap
 
 julia> reshape(y, Keep(), :) isa SubArray
 true
@@ -85,15 +85,15 @@ julia> reshape(z, Keep(), :)
  2  4  6  14  16  18
 ```
 - Direct arguments of reshape can not be integers when an axis operation is present.
-- `..` and `:` alone won't use AxisOperations.jl, as defining such methods would be type piracy. In these cases, `Keep(..)` and `Merge(..)` should be used instead.
+- `..` and `:` alone won't use Rewrap.jl, as defining such methods would be type piracy. In these cases, `Keep(..)` and `Merge(..)` should be used instead.
 
 ## Installation
 
 ```julia
 using Pkg
-Pkg.add("AxisOperations")
+Pkg.add("Rewrap")
 ```
 
 ## Contributing
 
-At the moment, AxisOperations explicitly defines optimizations in big codegen monoliths for generated function specializations, making the source code hard to parse. Ideally it would use a more modular approach. If you have any ideas or suggestions, please feel free to open an issue or a pull request.
+At the moment, Rewrap explicitly defines optimizations in big codegen monoliths for generated function specializations, making the source code hard to parse. Ideally it would use a more modular approach. If you have any ideas or suggestions, please feel free to open an issue or a pull request.
