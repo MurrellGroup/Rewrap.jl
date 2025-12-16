@@ -1,5 +1,6 @@
 @testset "Repeat" begin
-    @testset "repeat(PermutedDimsArray, ...)" begin
+
+    @testset "PermutedDimsArray" begin
         A = reshape(collect(1:24), 2, 3, 4)
         p = (1, 3, 2)
         x = PermutedDimsArray(A, p)
@@ -13,8 +14,5 @@
         y = Repeat((2, 1))(A)
         @test y == repeat(A, 2, 1)
     end
+
 end
-
-
-
-

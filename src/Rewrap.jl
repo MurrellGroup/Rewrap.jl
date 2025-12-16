@@ -1,4 +1,4 @@
-module AxisOperations
+module Rewrap
 
 using EllipsisNotation; export ..
 const Ellipsis = typeof(..)

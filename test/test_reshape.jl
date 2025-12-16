@@ -1,25 +1,24 @@
 @testset "Reshape" begin
-    @testset "shape correctness vs Base.reshape" begin
+
+    @testset "Equivalence" begin
         A = reshape(collect(1:24), 4, 3, 2)
 
-        y1 = reshape(A, Keep(3))
-        @test y1 == A
+        @test reshape(A, Keep(3)) == A
+        @test reshape(A, Keep(..)) == A
+        @test reshape(A, Merge(2), Keep(1)) == reshape(A, 12, 2)
+        @test reshape(A, Split(1, (2, 2)), Keep(2)) == reshape(A, 2, 2, 3, 2)
+        @test reshape(A, Split(1, (2, :)), Keep(2)) == reshape(A, 2, 2, 3, 2)
+        @test reshape(A, Split(1, (1, 4)), Keep(..)) == reshape(A, 1, 4, 3, 2)
+    end
 
-        y2 = reshape(A, Merge(2), Keep(1))
-        @test size(y2) == (12, 2)
-        @test y2 == reshape(A, 12, 2)
+    @testset "Colon notation" begin
+        A = reshape(collect(1:24), 4, 3, 2)
+        @test reshape(A, Keep(1), :) == reshape(A, 4, :)
+    end
 
-        y3 = reshape(A, Split(1, (2, 2)), Keep(2))
-        @test size(y3) == (2, 2, 3, 2)
-        @test y3 == reshape(A, 2, 2, 3, 2)
-
-        y4 = reshape(A, Split(1, (2, :)), Keep(2))
-        @test size(y4) == (2, 2, 3, 2)
-        @test y4 == reshape(A, 2, 2, 3, 2)
-
-        y5 = reshape(A, Split(1, (1, 4)), Keep(..))
-        @test size(y5) == (1, 4, 3, 2)
-        @test y5 == reshape(A, 1, 4, 3, 2)
+    @testset "Ellipsis notation" begin
+        A = reshape(collect(1:24), 4, 3, 2)
+        @test reshape(A, Split(1, (2, :)), ..) == reshape(A, 2, :, 3, 2)
     end
 
     @testset "Resqueeze" begin
@@ -27,11 +26,9 @@
         x = reshape(A, 1, 4, 3, 2)
 
         y = reshape(x, Squeeze(1), Keep(..))
-        @test y == reshape(A, 4, 3, 2)
-
+        @test y == A
         z = reshape(A, Unsqueeze(1), Keep(..))
-        @test size(z) == (1, 4, 3, 2)
-        @test z == reshape(A, 1, 4, 3, 2)
+        @test z == x
     end
 
     @testset "Split errors" begin
@@ -73,7 +70,7 @@
         x = PermutedDimsArray(A, (3, 1, 2))
         @test reshape(x, Keep(3)) == x
         @test reshape(x, Keep(), :) == PermutedDimsArray(reshape(A, :, 4), (2, 1))
-        @test _shares_storage(y, x)
+        @test _shares_storage(A, x)
     end
 end
 

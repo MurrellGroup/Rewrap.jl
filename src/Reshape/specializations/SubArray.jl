@@ -68,9 +68,39 @@ function _subarray_reshape_codegen(T, N::Int, M::Int, op_types::Core.SimpleVecto
             elseif n_in == 1
                 consume_view_dim_keep!() || return fallback()
             else
-                require_consecutive_slices!(n_in) || return fallback()
+                expected_pd = subdim_to_parent[subdim + 1]
+                drain_integer_dims_to!(expected_pd) || return fallback()
+                pd == expected_pd || return fallback()
+
+                for j in 0:(n_in - 2)
+                    subdim_to_parent[subdim + 1 + j] == expected_pd + j || return fallback()
+                    index_types[expected_pd + j] <: Base.Slice || return fallback()
+                end
+
+                last_j = n_in - 1
+                subdim_to_parent[subdim + 1 + last_j] == expected_pd + last_j || return fallback()
+                last_idx_type = index_types[expected_pd + last_j]
+
                 push!(parent_ops, :(ops[$k]))
-                push!(view_inds, :(:))
+
+                if last_idx_type <: Base.Slice
+                    push!(view_inds, :(:))
+                elseif last_idx_type <: Base.OneTo
+                    last_pd = expected_pd + last_j
+                    prod_parts = [:(size(parent(x), $(expected_pd + j))) for j in 0:(n_in - 2)]
+                    prod_expr = length(prod_parts) == 1 ? prod_parts[1] : Expr(:call, :*, prod_parts...)
+                    push!(view_inds, :(Base.OneTo(length(inds[$last_pd]) * $prod_expr)))
+                elseif last_idx_type <: UnitRange{<:Integer}
+                    last_pd = expected_pd + last_j
+                    prod_parts = [:(size(parent(x), $(expected_pd + j))) for j in 0:(n_in - 2)]
+                    prod_expr = length(prod_parts) == 1 ? prod_parts[1] : Expr(:call, :*, prod_parts...)
+                    push!(view_inds, :(let r = inds[$last_pd], prod = $prod_expr
+                        ((first(r) - 1) * prod + 1):(last(r) * prod)
+                    end))
+                else
+                    return fallback()
+                end
+
                 pd += n_in
                 subdim += n_in
             end

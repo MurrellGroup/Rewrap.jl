@@ -1,3 +1,32 @@
+"""
+    reshape(x, ops::Union{LocalReshape,Colon,EllipsisNotation.Ellipsis}...)
+
+Reshape the array `x` using the given operations.
+
+!!! note
+    `ops` *must* contain at least one `LocalReshape`.
+
+```jldoctest
+julia> x = rand(3, 5, 2);
+
+julia> x′ = reshape(x, Keep(), :);
+
+julia> size(x′)
+(3, 10)
+
+julia> y′ = rand(2, 3) * x′; # project from 3 to 2
+
+julia> size(y′)
+(2, 10)
+
+julia> y = reshape(y′, Keep(), Split(1, size(x)[2:end]));
+
+julia> size(y)
+(2, 5, 2)
+```
+"""
+Base.reshape
+
 @constprop function Base.reshape(
     x::AbstractArray{<:Any,N}, ops::Tuple{LocalReshape,Vararg{LocalReshape}}
 ) where N
