@@ -1,3 +1,13 @@
+"""
+    Reduce(f::Function; dims::NTuple{K,Int})
+
+Reduce an array over dimensions `dims`, using e.g.
+`sum`, `prod`, `minimum`, `maximum`, `any`, `all`, or `Statistics.mean`.
+
+`f` must accept a `dims::Tuple{Vararg{Int}}` keyword argument, allowing
+for reduction over specific dimensions. This should reduce the specified dimensions to singletons,
+but not drop them.
+"""
 struct Reduce{f,dims} <: GlobalAxisOp{..,..} end
 
 function Reduce(f::Function; dims::NTuple{K,Int}) where K

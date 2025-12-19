@@ -1,3 +1,10 @@
+"""
+    Repeat(repeats::NTuple{K,Int})
+
+Repeats an array along multiple dimensions.
+
+Can be applied to arrays with at most `K` dimensions.
+"""
 struct Repeat{K} <: GlobalAxisOp{..,..}
     repeats::NTuple{K,Int}
     function Repeat{K}(repeats::NTuple{K,Int}) where K
@@ -23,7 +30,6 @@ end
     )
 
     return quote
-        all(>=(0), op.repeats) || throw(ArgumentError("Repeats must be non-negative"))
         K <= N || throw(ArgumentError(
             "Repeat dimensions must be less than or equal to the number of dimensions of the array"
         ))
