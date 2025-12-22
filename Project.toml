@@ -1,6 +1,6 @@
 name = "Rewrap"
 uuid = "e37f04ce-ca06-4a96-b09f-ea39bec02b08"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Anton Oresten <antonoresten@proton.com> and contributors"]
 
 [workspace]
@@ -12,4 +12,4 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 
 [compat]
 EllipsisNotation = "1"
-julia = "1.10"
+julia = "1.9"
