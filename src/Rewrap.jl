@@ -32,7 +32,7 @@ end
 include("Reshape/Reshape.jl")
 export Keep
 export Merge
-export Split
+export Split, Split1
 export Resqueeze, Squeeze, Unsqueeze
 
 include("Permute.jl")

@@ -1,6 +1,6 @@
 name = "Rewrap"
 uuid = "e37f04ce-ca06-4a96-b09f-ea39bec02b08"
-version = "0.1.3"
+version = "0.1.4"
 authors = ["Anton Oresten <antonoresten@proton.com> and contributors"]
 
 [workspace]

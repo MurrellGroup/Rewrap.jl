@@ -50,6 +50,7 @@ Merge(N::IntOrEllipsis) = Merge{N}()
 """
     Split(N, sizes)
     Split{N}(sizes...)
+    Split(sizes)
 
 Split the first `N` dimensions into `M` dimensions, with sizes given by a tuple
 of integers and at most one colon (`:`).
@@ -80,6 +81,8 @@ Split(N::IntOrEllipsis, sizes::T) where {M,T<:NTuple{M,IntOrColon}} =
     Split{N,M,T}(sizes)
 
 Split{N}(sizes::IntOrColon...) where N = Split(N, sizes)
+
+Split(sizes::Tuple{Vararg{IntOrColon}}) = Split(1, sizes)
 
 """
     Split1(sizes...)
