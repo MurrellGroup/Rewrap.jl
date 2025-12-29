@@ -4,7 +4,7 @@ version = "0.1.6"
 authors = ["Anton Oresten <antonoresten@proton.me> and contributors"]
 
 [workspace]
-projects = ["test"]
+projects = ["test", "docs"]
 
 [deps]
 EllipsisNotation = "da5c29d0-fa7d-589e-88eb-ea29b0a81949"
