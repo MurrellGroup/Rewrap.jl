@@ -1,7 +1,7 @@
 name = "Rewrap"
 uuid = "e37f04ce-ca06-4a96-b09f-ea39bec02b08"
-version = "0.1.5"
-authors = ["Anton Oresten <antonoresten@proton.com> and contributors"]
+version = "0.1.6"
+authors = ["Anton Oresten <antonoresten@proton.me> and contributors"]
 
 [workspace]
 projects = ["test"]
