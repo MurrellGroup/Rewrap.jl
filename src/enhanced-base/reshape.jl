@@ -27,7 +27,8 @@ julia> y = Rewrap.reshape(y′, Keep(), Split(1, size(x)[2:end]));
 julia> size(y)
 (2, 5, 2)
 
-julia> Rewrap.reshape(view(rand(2, 3), :, 1:2), :) # Rewrap owns `Rewrap.reshape`
+julia> Rewrap.reshape(view(rand(2, 3), :, 1:2), :) |> summary # Rewrap owns `Rewrap.reshape`
+"4-element view(::Vector{Float64}, 1:4) with eltype Float64"
 ```
 """
 function reshape end
@@ -85,7 +86,8 @@ julia> y = reshape(y′, Keep(), Split(1, size(x)[2:end]));
 julia> size(y)
 (2, 5, 2)
 
-julia> reshape(view(rand(2, 3), :, 1:2), Merge(..)) # can not use a single `:` (type piracy)
+julia> reshape(view(rand(2, 3), :, 1:2), Merge(..)) |> summary # can not use a single `:` (type piracy)
+"4-element view(::Vector{Float64}, 1:4) with eltype Float64"
 ```
 """
 Base.reshape
