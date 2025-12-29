@@ -68,6 +68,8 @@ Reshape the array `x` using the given operations, which can include
 `:` (Base.Colon) and `..` (EllipsisNotation.Ellipsis), but there
 must be at least one `LocalReshape`.
 
+See also [`Rewrap.reshape`](@ref).
+
 ```jldoctest
 julia> x = view(rand(4, 5, 2), 1:3, :, :);
 
