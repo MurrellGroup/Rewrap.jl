@@ -157,6 +157,10 @@ function _preprocess_op_types(op_types)
     length(runs) == 1 || throw(ArgumentError("Int/Colon must form a single contiguous sequence"))
     has_ellipsis && throw(ArgumentError("Cannot mix Ellipsis (..) with Int/Colon sequence"))
     
+    start, stop = runs[1]
+    colon_count = count(i -> op_types[i] <: Colon, start:stop)
+    colon_count <= 1 || throw(ArgumentError("Split can have at most one Colon in sizes"))
+
     return op_types, :split_sequence => runs[1]
 end
 
