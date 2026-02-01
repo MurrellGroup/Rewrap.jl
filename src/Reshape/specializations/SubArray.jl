@@ -164,12 +164,31 @@ function _subarray_reshape_codegen(T, N::Int, M::Int, op_types::Core.SimpleVecto
                     push!(tuple_parts, :(:))
                     sizes_tuple_expr = Expr(:tuple, tuple_parts...)
 
+                    # Compute the divisor that the parent dimension must satisfy
+                    middle_prod_parts = [:(sizes[$j]) for j in 2:(m_out - 1)]
+                    if isempty(middle_prod_parts)
+                        divisor_expr = :n
+                    else
+                        middle_prod_expr = length(middle_prod_parts) == 1 ? middle_prod_parts[1] : Expr(:call, :*, middle_prod_parts...)
+                        divisor_expr = :(n * $middle_prod_expr)
+                    end
+
                     push!(parent_ops, :(let sizes = ops[$k].sizes, n = $n_expr
                         n > 0 || throw(ArgumentError("Split sizes must be positive; got n=$n"))
                         $(m_out > 2 ? :(for j in 2:$(m_out - 1)
                             sj = sizes[j]
                             sj > 0 || throw(ArgumentError("Split sizes must be positive; got sizes[$j]=$sj"))
                         end) : nothing)
+                        # Check parent dimension compatibility before attempting the Split
+                        parent_dim = size(parent(x), $pd_idx)
+                        divisor = $divisor_expr
+                        parent_dim % divisor == 0 || throw(DimensionMismatch(
+                            string(
+                                "Cannot reshape SubArray view: parent dimension ", parent_dim,
+                                " is not divisible by ", divisor,
+                                ". Consider using copy() to materialize the view first."
+                            )
+                        ))
                         Split(1, $sizes_tuple_expr)
                     end))
 
