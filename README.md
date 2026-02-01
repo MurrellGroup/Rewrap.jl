@@ -27,7 +27,7 @@ true
 
 We use `size(y, 1)` in our reshape, but despite preserving the first dimension (the one dimension only partially sliced) it evaluates to an integer at runtime, and Julia has no way of knowing that it represents preserving the first dimension.
 
-The size could in theory be constant-propagated [if the size wasn't dynamic](https://github.com/JuliaArrays/FixedSizeArrays.jl), or [if the size is embedded in the type](https://github.com/JuliaArrays/StaticArrays.jl). But even then, integers alone are not useful once passed through `reshape`.
+The size could in theory be constant-propagated [if the size wasn't dynamic](https://github.com/JuliaArrays/FixedSizeArrays.jl), or [if the size is embedded in the type](https://github.com/JuliaArrays/StaticArrays.jl). But integers lack *intent*, and are hard to track.
 
 Rewrap provides types like `Keep`, `Merge`, and `Split` that encode reshape structure at compile-time, enabling rewrapping optimizations.
 
