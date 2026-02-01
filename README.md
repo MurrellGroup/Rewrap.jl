@@ -119,6 +119,7 @@ julia> reshape(z, Keep(), :)
  2  4  6  14  16  18
 ```
 - `..` and `:` alone won't use Rewrap.jl, as defining such methods would be type piracy. In these cases, `Keep(..)` and `Merge(..)` should be used instead.
+- In the `Split` example above, certain divisibility requirements are imposed on the parent dimension.
 
 ## Installation
 
