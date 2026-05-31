@@ -28,4 +28,5 @@ Reshape
 Permute
 Reduce
 Repeat
+Rewrap.supports_fallback
 ```
