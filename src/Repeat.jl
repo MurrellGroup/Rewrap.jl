@@ -19,6 +19,15 @@ function (op::Repeat{K})(x::AbstractArray{<:Any,N}) where {N,K}
     return repeat(x, op.repeats...)
 end
 
+# Generic fallback for non-AbstractArray types that opt in via `supports_fallback`.
+# `@inline` exposes the inner `repeat(x, ...)` to accelerator backends that lower
+# by walking IR (see the note on the generic `Reshape` executor).
+@inline function (op::Repeat{K})(x) where {K}
+    supports_fallback(x) || throw(MethodError(op, (x,)))
+    K <= ndims(x) || throw(ArgumentError("Repeat dimensions must be less than or equal to the number of dimensions of the array"))
+    return repeat(x, op.repeats...)
+end
+
 @generated function (op::Repeat{K})(
     x::PermutedDimsArray{T,N,perm,iperm,P},
 ) where {K,T,N,perm,iperm,P}

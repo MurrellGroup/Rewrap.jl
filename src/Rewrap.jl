@@ -29,6 +29,8 @@ macro constprop(ex, setting::Symbol=:aggressive)
     :(Base.@constprop $setting $ex)
 end
 
+include("fallback.jl")
+
 include("Reshape/Reshape.jl")
 export Reshape
 export Keep

@@ -92,7 +92,7 @@ end
     end
 end
 
-@inline keep_sizes(x::AbstractArray, offset::Int, ::Val{n}) where {n} =
+@inline keep_sizes(x, offset::Int, ::Val{n}) where {n} =
     ntuple(i -> size(x, offset + i), Val(n))
 
 @inline ones_sizes(::Val{n}) where {n} =
