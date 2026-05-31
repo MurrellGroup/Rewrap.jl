@@ -73,3 +73,35 @@ end
         $body
     end
 end
+
+# Generic fallback for non-AbstractArray types that opt in via `supports_fallback`.
+# Uses the same codegen, which is built from `size`, `Base.reshape`, and the
+# `keep_sizes`/`split_sizes` helpers — all of which are type-agnostic.
+#
+# The `supports_fallback` opt-in is checked in this plain (non-`@generated`)
+# wrapper rather than inside the generator: types opt in from downstream packages
+# and extensions (e.g. cuTile via `Rewrap.supports_fallback(::Type{<:Tile})`),
+# whose methods are defined in a later world than this `Reshape` definition. A
+# `@generated` generator only sees methods up to its own definition world, so
+# querying `supports_fallback` there would never observe those opt-ins and would
+# always take the throw branch. As a normal call it resolves at the caller's
+# world (with backedges) and constant-folds away for opted-in types.
+#
+# `@inline` is load-bearing for accelerator backends (e.g. cuTile): they lower by
+# walking optimized IR and mapping each call to an intrinsic, and do not recurse
+# into an un-inlined functor. Inlining exposes the inner `Base.reshape(x, dims)`
+# (which such backends map to a native reshape) instead of an opaque `Reshape`
+# functor invoke.
+@inline function (r::Reshape{OpsT,N,M})(x) where {OpsT,N,M}
+    supports_fallback(x) || throw(MethodError(r, (x,)))
+    return _reshape_fallback(r, x)
+end
+
+@inline @generated function _reshape_fallback(r::Reshape{OpsT,N,M}, x) where {OpsT,N,M}
+    op_types = OpsT.parameters
+    body = _abstractarray_reshape_codegen(op_types, N)
+    return quote
+        ops = r.ops
+        $body
+    end
+end

@@ -19,6 +19,14 @@ function (::Reduce{f,dims})(x::AbstractArray{<:Any,N}) where {N,f,dims}
     return f(x; dims)
 end
 
+# Generic fallback for non-AbstractArray types that opt in via `supports_fallback`.
+# `@inline` exposes the inner `f(x; dims)` to accelerator backends that lower by
+# walking IR (see the note on the generic `Reshape` executor).
+@inline function (op::Reduce{f,dims})(x) where {f,dims}
+    supports_fallback(x) || throw(MethodError(op, (x,)))
+    return f(x; dims)
+end
+
 # unwrap a lazy permute if only the reduced dimensions were being permuted
 @generated function (r::Reduce{f,dims})(x::PermutedDimsArray{<:Any,N,perm}) where {N,perm,f,dims}
     moved = filter(i -> perm[i] != i, 1:N)
@@ -40,3 +48,6 @@ end
 
 # resolve ambiguity
 (::Reduce{<:Any,()})(x::PermutedDimsArray) = x
+
+# generic fallback; more specific than `(::Reduce{f,dims})(x)` so no ambiguity
+@inline (op::Reduce{<:Any,()})(x) = supports_fallback(x) ? x : throw(MethodError(op, (x,)))
