@@ -19,11 +19,12 @@ function (::Reduce{f,dims})(x::AbstractArray{<:Any,N}) where {N,f,dims}
     return f(x; dims)
 end
 
-# Generic fallback for non-AbstractArray types that opt in via `supports_fallback`.
+# Generic method for non-AbstractArray types, built on `f(x; dims)` with its
+# `Base` reduction semantics (reduced dims kept as singletons); a type without
+# such a method for `f` fails with its `MethodError`.
 # `@inline` exposes the inner `f(x; dims)` to accelerator backends that lower by
 # walking IR (see the note on the generic `Reshape` executor).
 @inline function (op::Reduce{f,dims})(x) where {f,dims}
-    supports_fallback(x) || throw(MethodError(op, (x,)))
     return f(x; dims)
 end
 
@@ -49,5 +50,5 @@ end
 # resolve ambiguity
 (::Reduce{<:Any,()})(x::PermutedDimsArray) = x
 
-# generic fallback; more specific than `(::Reduce{f,dims})(x)` so no ambiguity
-@inline (op::Reduce{<:Any,()})(x) = supports_fallback(x) ? x : throw(MethodError(op, (x,)))
+# generic method; more specific than `(::Reduce{f,dims})(x)` so no ambiguity
+@inline (op::Reduce{<:Any,()})(x) = x

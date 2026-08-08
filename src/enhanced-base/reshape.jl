@@ -45,7 +45,7 @@ end
 # Generic sibling for non-AbstractArray types. Kept separate from the
 # `AbstractArray` method (rather than relaxing it) so arrays still hit the more
 # specific method and there is no ambiguity with the `args...` passthrough above.
-# Opt-in is enforced downstream in the `Reshape` executor via `supports_fallback`.
+# Executes via the generic `Reshape` method, built on type-agnostic primitives.
 # `@inline` so the `r(x)` executor call is exposed to accelerator backends that
 # lower by walking IR (see the note on the generic `Reshape` executor).
 @inline @constprop function Rewrap.reshape(x, ops::Tuple{AnyOp,Vararg{AnyOp}})
@@ -113,7 +113,7 @@ end
 
 # Generic sibling for non-AbstractArray types. Dispatching on the
 # `LocalReshape`-bearing tuple keeps this a legitimate (non-pirating) method on
-# `Base.reshape`. Opt-in is enforced downstream via `supports_fallback`.
+# `Base.reshape`.
 @constprop function Base.reshape(x, ops::LocalReshapeOpsTuple)
     return Rewrap.reshape(x, ops)
 end

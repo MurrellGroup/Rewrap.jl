@@ -19,11 +19,11 @@ function (::Permute{perm,N})(x::AbstractArray{<:Any,N}) where {perm,N}
     is_identity_perm(perm) ? x : permutedims(x, perm)
 end
 
-# Generic fallback for non-AbstractArray types that opt in via `supports_fallback`.
+# Generic method for non-AbstractArray types, built on `permutedims` assumed to
+# have its `Base` semantics; a type without it fails with its `MethodError`.
 # `@inline` exposes the inner `permutedims(x, perm)` to accelerator backends that
 # lower by walking IR (see the note on the generic `Reshape` executor).
 @inline function (op::Permute{perm,N})(x) where {perm,N}
-    supports_fallback(x) || throw(MethodError(op, (x,)))
     is_identity_perm(perm) ? x : permutedims(x, perm)
 end
 
