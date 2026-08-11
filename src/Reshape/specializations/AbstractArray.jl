@@ -1,75 +1,15 @@
-function _abstractarray_reshape_codegen(op_types::Core.SimpleVector, N::Int)
-    ellipsis_idx = nothing
-    fixed_in = 0
-    has_ellipsis_out = false
-    for (k, op) in enumerate(op_types)
-        n_in = ndims_in(op)
-        if is_ellipsis(n_in)
-            ellipsis_idx !== nothing && throw(ArgumentError("At most one op can have Ellipsis input"))
-            ellipsis_idx = k
-        else
-            fixed_in += n_in
-        end
-        has_ellipsis_out |= is_ellipsis(ndims_out(op))
-    end
+# Generic AbstractArray fallback for Reshape application. Lowers the resolved
+# op tuple to a Layout.Plan via `_ops_to_plan`, then materializes against the
+# array. The specializations for SubArray / PermutedDimsArray /
+# ReinterpretArray below this still match first when applicable; they
+# `invoke` back into this method for cases they can't fold.
 
-    if ellipsis_idx !== nothing
-        ellipsis_n = N - fixed_in
-        ellipsis_n >= 0 || throw(ArgumentError("Ops need $fixed_in dims but array has $N"))
-    else
-        has_ellipsis_out && throw(ArgumentError("Ellipsis output requires an Ellipsis input"))
-        fixed_in == N || throw(ArgumentError("Ops consume $fixed_in dims but array has $N"))
-        ellipsis_n = 0
-    end
-
-    shape_parts = Any[]
-    checks = Any[]
-    in_dim = 0
-
-    for (k, op) in enumerate(op_types)
-        n_in = is_ellipsis(ndims_in(op)) ? ellipsis_n : ndims_in(op)
-        m_out = is_ellipsis(ndims_out(op)) ? ellipsis_n : ndims_out(op)
-
-        if op <: Keep
-            push!(shape_parts, Expr(:..., :(keep_sizes(x, $in_dim, Val($n_in)))))
-
-        elseif op <: Merge
-            push!(shape_parts, _dimprod_expr(:x, in_dim, n_in))
-
-        elseif op <: Split
-            input_prod = _dimprod_expr(:x, in_dim, n_in)
-            push!(shape_parts, Expr(:..., :(split_sizes(ops[$k], $input_prod))))
-
-        elseif op <: Resqueeze
-            for j in 1:n_in
-                pos = in_dim + j
-                push!(checks, :(size(x, $pos) == 1 || throw(DimensionMismatch(
-                    string("Resqueeze expects size-1 dim at position ", $pos, ", got ", size(x, $pos))
-                ))))
-            end
-            push!(shape_parts, Expr(:..., :(ones_sizes(Val($m_out)))))
-        end
-
-        in_dim += n_in
-    end
-
-    shape_tuple = Expr(:tuple, shape_parts...)
-
-    if isempty(checks)
-        return :(Base.reshape(x, $shape_tuple))
-    end
-
-    return quote
-        $(checks...)
-        Base.reshape(x, $shape_tuple)
-    end
-end
-
-@generated function (r::Reshape{OpsT,N,M})(x::AbstractArray{<:Any,N}) where {OpsT,N,M}
-    op_types = OpsT.parameters
-    body = _abstractarray_reshape_codegen(op_types, N)
-    return quote
-        ops = r.ops
-        $body
-    end
+function (r::Reshape{OpsT,N,M})(x::AbstractArray{<:Any,N}) where {OpsT,N,M}
+    op_plan = _ops_to_plan(r.ops, Val(N))
+    # AbstractArray's `layout` is identity (no cropping anywhere), so the
+    # composed Plan's parent extents come straight from `x` and the only
+    # operation needed is a single `Base.reshape`. Bypassing `materialize`'s
+    # view/reshape branch keeps inference type-stable end-to-end —
+    # important for downstream `@inferred` users like Einops.
+    return Base.reshape(x, Layout.output_shape(op_plan, x))
 end

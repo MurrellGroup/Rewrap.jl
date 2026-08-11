@@ -1,110 +1,77 @@
-function _reinterp_reshape_codegen(T, N::Int, M::Int, op_types::Core.SimpleVector, S, check::Bool)
-    fallback() = :(invoke(r, Tuple{AbstractArray{$T,$N}}, x))
+# ReinterpretArray dispatch. The Layout IR is element-count-agnostic; it
+# can't natively express "this dim's stride is scaled by sizeof(S)/sizeof(T)".
+# We keep the wrapper outside the IR: modify the user's ops to apply
+# directly to `parent(x)` (accounting for the ratio dim per `check` mode),
+# run them through Layout's normal Reshape path, then `reinterpret(...)`
+# the result. The choice between `reinterpret(T, …)` and
+# `reinterpret(reshape, T, …)` follows whether the ratio dim is preserved
+# in the output (Keep on dim 1 in check=true mode preserves it).
+#
+# Mode reference:
+#   `check=false`:  ndims(x) == ndims(parent). Dim 1 of x = parent dim 1
+#                   with stride scaled by sizeof(S)/sizeof(T).
+#   `check=true` (sizeof(T) < sizeof(S)): ndims(x) = ndims(parent)+1, with
+#                   x's dim 1 = the ratio. Other x dims = parent dims 1..N.
 
-    _ops_has_ellipsis(op_types) && return fallback()
-
-    total_in = _ops_total_in(op_types)
-    (total_in === nothing || total_in != N) && return fallback()
-
-    all(op -> op <: Keep, op_types) && return :x
-
-    all_merge = length(op_types) == 1 && op_types[1] <: Merge
-    all_merge && return :(reinterpret($T, Base.reshape(parent(x), Merge(..))))
-
-    parent_N = check ? N - 1 : N
-
-    function build_parent_ops(skip_first::Bool, first_op_override=nothing)
-        parent_ops = Any[]
-        for (k, opT) in enumerate(op_types)
-            if k == 1 && skip_first
-                first_op_override !== nothing && push!(parent_ops, first_op_override)
-                continue
-            end
-            if opT <: Keep
-                push!(parent_ops, :(Keep($(ndims_in(opT)))))
-            elseif opT <: Merge
-                push!(parent_ops, :(Merge($(ndims_in(opT)))))
-            elseif opT <: Split
-                push!(parent_ops, :(ops[$k]))
-            elseif opT <: Resqueeze
-                push!(parent_ops, :(ops[$k]))
-            else
-                return nothing
-            end
-        end
-        return Expr(:tuple, parent_ops...)
-    end
-
-    if check
-        first_op = op_types[1]
-        n_in_first = ndims_in(first_op)
-
-        if first_op <: Keep && n_in_first == 1
-            parent_ops_tuple = build_parent_ops(true)
-            parent_ops_tuple === nothing && return fallback()
-            return quote
-                ops = r.ops
-                parent_ops = $parent_ops_tuple
-                parent_r = Reshape(parent_ops, Val($parent_N))
-                reinterpret(Base.reshape, $T, parent_r(parent(x)))
-            end
-
-        elseif first_op <: Merge && n_in_first >= 1
-            merge_count = n_in_first - 1
-            parent_ops_tuple = build_parent_ops(true, :(Merge($merge_count)))
-            parent_ops_tuple === nothing && return fallback()
-            return quote
-                ops = r.ops
-                parent_ops = $parent_ops_tuple
-                parent_r = Reshape(parent_ops, Val($parent_N))
-                reinterpret($T, parent_r(parent(x)))
-            end
-        else
-            return fallback()
-        end
-    else
-        first_op = op_types[1]
-        n_in_first = ndims_in(first_op)
-
-        if (first_op <: Keep && n_in_first == 1) || (first_op <: Merge && n_in_first >= 1)
-            parent_ops_tuple = build_parent_ops(false)
-            parent_ops_tuple === nothing && return fallback()
-            return quote
-                ops = r.ops
-                parent_ops = $parent_ops_tuple
-                parent_r = Reshape(parent_ops, Val($parent_N))
-                reinterpret($T, parent_r(parent(x)))
-            end
-
-        elseif first_op <: Split && n_in_first == 1
-            ratio = sizeof(S) ÷ sizeof(T)
-            sizes_type = first_op.parameters[3]
-            sizes_type <: Tuple || return fallback()
-            length(sizes_type.parameters) >= 1 || return fallback()
-            first_size_type = sizes_type.parameters[1]
-            first_size_type <: Int || return fallback()
-
-            parent_ops_tuple = build_parent_ops(true, :(Split(1, (first_size ÷ $ratio, ops[1].sizes[2:end]...))))
-            parent_ops_tuple === nothing && return fallback()
-            return quote
-                ops = r.ops
-                first_size = ops[1].sizes[1]
-                if first_size % $ratio == 0
-                    parent_ops = $parent_ops_tuple
-                    parent_r = Reshape(parent_ops, Val($parent_N))
-                    reinterpret($T, parent_r(parent(x)))
-                else
-                    invoke(r, Tuple{AbstractArray{$T,$N}}, x)
-                end
-            end
-        else
-            return fallback()
-        end
-    end
-end
-
-@generated function (r::Reshape{OpsT,N,M})(
+function (r::Reshape{OpsT,N,M})(
     x::Base.ReinterpretArray{T,N,S,A,check},
 ) where {OpsT,N,M,T,S,A,check}
-    _reinterp_reshape_codegen(T, N, M, OpsT.parameters, S, check)
+    # All-Keep: identity on x.
+    all_keep(r.ops) && return x
+
+    parent_ops = _ra_modify_ops(r.ops, Val(check), T, S)
+    parent_ops === nothing && return invoke(r, Tuple{AbstractArray{T,N}}, x)
+
+    parent_N = ndims(A)
+    reshaped_parent = Reshape(parent_ops, Val(parent_N))(parent(x))
+
+    # In check=true mode, a leading `Keep` preserves the ratio dim — so we
+    # re-add it via `reinterpret(reshape, T, …)`. All other cases (check=false
+    # everywhere; check=true with a leading Merge that absorbs the ratio dim)
+    # produce a flat-first-dim result, which is exactly `reinterpret(T, …)`.
+    if check && first(r.ops) isa Keep
+        # `Base.reshape` is qualified because Rewrap exports a `reshape` of
+        # its own (in enhanced-base/), which would otherwise shadow Base's
+        # — and `reinterpret`'s special second-arg form keys off the
+        # function-value identity, not the symbol.
+        return reinterpret(Base.reshape, T, reshaped_parent)
+    else
+        return reinterpret(T, reshaped_parent)
+    end
 end
+
+@inline all_keep(::Tuple{}) = true
+@inline all_keep(ops::Tuple) = first(ops) isa Keep && all_keep(Base.tail(ops))
+
+# check=true: the first op must consume the ratio dim cleanly.
+@inline _ra_modify_ops(ops::Tuple, ::Val{true}, ::Type, ::Type) =
+    _ra_check_true(first(ops), Base.tail(ops))
+
+@inline _ra_check_true(::Keep{1}, rest::Tuple) = rest
+@inline _ra_check_true(::Merge{1}, rest::Tuple) = rest
+@inline _ra_check_true(::Merge{N}, rest::Tuple) where {N} = (Merge(N - 1), rest...)
+@inline _ra_check_true(_, ::Tuple) = nothing
+
+# check=false: dim 1 of x is parent dim 1 with stride scaled by ratio. Keep
+# and Merge starting at dim 1 pass through unchanged. Split(1, sizes) needs
+# the first size divisible by ratio.
+@inline _ra_modify_ops(ops::Tuple, ::Val{false}, ::Type{T}, ::Type{S}) where {T, S} =
+    _ra_check_false(first(ops), Base.tail(ops), T, S)
+
+@inline _ra_check_false(::Keep{1}, rest::Tuple, ::Type, ::Type) =
+    (Keep(1), rest...)
+@inline _ra_check_false(::Merge{N}, rest::Tuple, ::Type, ::Type) where {N} =
+    (Merge(N), rest...)
+
+@inline function _ra_check_false(op::Split{1,Mout,SizesT}, rest::Tuple,
+                                  ::Type{T}, ::Type{S}) where {Mout, SizesT, T, S}
+    sizes = op.sizes
+    first_sz = sizes[1]
+    first_sz isa Int || return nothing            # Colon-first → refuse
+    ratio = sizeof(S) ÷ sizeof(T)
+    first_sz % ratio == 0 || return nothing       # alignment fails
+    new_sizes = (first_sz ÷ ratio, Base.tail(sizes)...)
+    return (Split(1, new_sizes), rest...)
+end
+
+@inline _ra_check_false(_, ::Tuple, ::Type, ::Type) = nothing

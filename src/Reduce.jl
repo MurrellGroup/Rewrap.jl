@@ -19,21 +19,18 @@ function (::Reduce{f,dims})(x::AbstractArray{<:Any,N}) where {N,f,dims}
     return f(x; dims)
 end
 
-# unwrap a lazy permute if only the reduced dimensions were being permuted
-@generated function (r::Reduce{f,dims})(x::PermutedDimsArray{<:Any,N,perm}) where {N,perm,f,dims}
+# Unwrap a lazy permute when the moved dims are a subset of the reduced dims —
+# in that case the permutation is invisible to the reduction, so we can reduce
+# the parent directly along the matching parent dims.
+function (r::Reduce{f,dims})(x::PermutedDimsArray{<:Any,N,perm}) where {N,perm,f,dims}
     moved = filter(i -> perm[i] != i, 1:N)
     dims′ = filter(<=(N), dims)
 
     if all(in(dims′), moved)
-        parent_dims = Tuple(perm[d] for d in dims′)
-        return quote
-            f(parent(x); dims=$(QuoteNode(parent_dims)))
-        end
+        parent_dims = ntuple(i -> perm[dims′[i]], length(dims′))
+        return f(parent(x); dims=parent_dims)
     end
-
-    return quote
-        f(x; dims=$(QuoteNode(dims′)))
-    end
+    return f(x; dims=dims′)
 end
 
 (::Reduce{<:Any,()})(x::AbstractArray) = x

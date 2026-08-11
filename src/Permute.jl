@@ -19,18 +19,19 @@ function (::Permute{perm,N})(x::AbstractArray{<:Any,N}) where {perm,N}
     is_identity_perm(perm) ? x : permutedims(x, perm)
 end
 
-@generated function (::Permute{perm2,N})(x::PermutedDimsArray{T,N,perm1}) where {perm2,N,T,perm1}
-    is_identity_perm(perm2) && return :(x)
-    perm_total = ntuple(i -> perm1[perm2[i]], Val(N))
-    if is_identity_perm(perm_total)
-        return :(parent(x))
-    end
-    return :(PermutedDimsArray(parent(x), $(QuoteNode(perm_total))))
+# Permute on a PDA: routes through the Layout IR. Permute is a pure
+# structural op (no value change), so it composes cleanly with the wrapper's
+# layout. `materialize` then either returns parent (when the perms cancel),
+# or emits a single fused `PermutedDimsArray`.
+function (::Permute{perm2,N})(x::PermutedDimsArray{T,N,perm1}) where {perm2,N,T,perm1}
+    arr_plan = Layout.layout(x)
+    op_plan = Layout.Plan{N}(ntuple(i -> Layout.Slice(perm2[i]), Val(N)))
+    return Layout.materialize(Layout.compose(op_plan, arr_plan), Layout.root_parent(x))
 end
 
 using LinearAlgebra: Transpose, Adjoint
 const AdjOrTrans{T,P} = Union{Transpose{T,P},Adjoint{T,P}}
 
-@generated function (::Permute{perm2,2})(x::AdjOrTrans{<:Real,P}) where {perm2,P}
-    is_identity_perm(perm2) ? :(x) : :(parent(x))
+function (::Permute{perm2,2})(x::AdjOrTrans{<:Real,P}) where {perm2,P}
+    is_identity_perm(perm2) ? x : parent(x)
 end
